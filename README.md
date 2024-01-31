@@ -21,10 +21,14 @@ This section contains the code for joystick control as well as training and test
 **Support Algorithms 支持算法**
 
 ```behavior cloning``` 
+
 ```diffusion policy```
 
 **Quick User Guide 使用方法:**
-In order to play without assistance of the agent:
+
+
+Before run the cmds below, run
+ ```mkdir -p tmp/bc && mkdir -p tmp/dp```
 ```
 python3 collect_data.py
 python3 train_bc.py
