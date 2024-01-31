@@ -27,7 +27,7 @@ This section contains the code for joystick control as well as training and test
 **Quick User Guide 使用方法:**
 
 
-Before run the cmds below, run
+Before running the cmds below, run
  ```mkdir -p tmp/bc && mkdir -p tmp/dp```
 ```
 python3 collect_data.py
