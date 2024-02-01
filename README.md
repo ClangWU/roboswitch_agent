@@ -6,7 +6,7 @@ sudo apt upgrade
 ```
 2. Install dependencies:
 ```
-pip install torch torchvision
+pip install torch==1.12.1 torchvision
 pip install panda-gym 
 pip install gin-config
 pip install PyOpenGL 

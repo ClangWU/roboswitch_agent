@@ -13,7 +13,6 @@
 import ast
 import numpy as np
 import torch
-import zarr
 import pandas as pd
 def create_sample_indices(
         episode_ends:np.ndarray, sequence_length:int,

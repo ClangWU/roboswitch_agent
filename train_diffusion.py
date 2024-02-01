@@ -6,14 +6,12 @@ import math
 import torch
 import torch.nn as nn
 import collections
-import zarr
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
 from tqdm.auto import tqdm
 from algorithm.dp.noisenet import ConditionalUnet1D
 # env import
-import pygame
 import algorithm.dp.dataset as ds
 from huggingface_hub.utils import IGNORE_GIT_FOLDER_PATTERNS
 import numpy as np

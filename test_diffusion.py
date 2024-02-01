@@ -6,7 +6,6 @@ import math
 import torch
 import torch.nn as nn
 import collections
-import zarr
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
