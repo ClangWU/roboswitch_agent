@@ -39,20 +39,21 @@ class RealEnv:
     
     def get_force(self):
         state = self.robot.read_once()
-        
-        return 
+        _Gravity = np.array([0.0, 0.0, -2.9])
+        full_matrix = np.array(state.O_T_EE).reshape(4, 4)  # 假设 O_T_EE 是一个长度为 16 的列表或数组
+        rotation_matrix = full_matrix[0:3, 0:3]
+        GinF = rotation_matrix.T @ _Gravity
 
-    def get_images(self):
-        return self.image_recorder.get_images()
+        compensated_force = np.array([
+        state.K_F_ext_hat_K[0] + GinF[0],
+        state.K_F_ext_hat_K[1] + GinF[1],
+        state.K_F_ext_hat_K[2] + GinF[2]
+        ])
 
-    def set_gripper_pose(self, left_gripper_desired_pos_normalized, right_gripper_desired_pos_normalized):
-        left_gripper_desired_joint = PUPPET_GRIPPER_JOINT_UNNORMALIZE_FN(left_gripper_desired_pos_normalized)
-        self.gripper_command.cmd = left_gripper_desired_joint
-        self.puppet_bot_left.gripper.core.pub_single.publish(self.gripper_command)
+        force_in_world = rotation_matrix @ compensated_force
+        return force_in_world
 
-        right_gripper_desired_joint = PUPPET_GRIPPER_JOINT_UNNORMALIZE_FN(right_gripper_desired_pos_normalized)
-        self.gripper_command.cmd = right_gripper_desired_joint
-        self.puppet_bot_right.gripper.core.pub_single.publish(self.gripper_command)
+    def set_gripper(self, left_gripper_desired_pos_normalized, right_gripper_desired_pos_normalized):
 
     def _reset_joints(self):
         reset_position = START_ARM_POSE[:6]
