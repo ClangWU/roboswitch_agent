@@ -48,6 +48,21 @@ class RealEnv:
     def set_gripper(self, pos):
         
             self.gripper.move(pos)
+        _Gravity = np.array([0.0, 0.0, -2.9])
+        full_matrix = np.array(state.O_T_EE).reshape(4, 4)  # 假设 O_T_EE 是一个长度为 16 的列表或数组
+        rotation_matrix = full_matrix[0:3, 0:3]
+        GinF = rotation_matrix.T @ _Gravity
+
+        compensated_force = np.array([
+        state.K_F_ext_hat_K[0] + GinF[0],
+        state.K_F_ext_hat_K[1] + GinF[1],
+        state.K_F_ext_hat_K[2] + GinF[2]
+        ])
+
+        force_in_world = rotation_matrix @ compensated_force
+        return force_in_world
+
+    def set_gripper(self, left_gripper_desired_pos_normalized, right_gripper_desired_pos_normalized):
 
     def _reset_joints(self):
         reset_position = START_ARM_POSE[:6]
@@ -102,7 +117,7 @@ def get_action(master_bot_left, master_bot_right):
     # Arm actions
     action[:6] = master_bot_left.dxl.joint_states.position[:6]
     action[7:7+6] = master_bot_right.dxl.joint_states.position[:6]
-    # Gripper actions
+    # Gripper actions 
     action[6] = MASTER_GRIPPER_JOINT_NORMALIZE_FN(master_bot_left.dxl.joint_states.position[6])
     action[7+6] = MASTER_GRIPPER_JOINT_NORMALIZE_FN(master_bot_right.dxl.joint_states.position[6])
 
