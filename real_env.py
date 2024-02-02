@@ -26,8 +26,8 @@ class RealEnv:
         parser = ArgumentParser()
         parser.add_argument('--host', default='192.168.1.100', help='FCI IP of the robot')
         args = parser.parse_args()
-
         self.robot = Robot(args.host)
+        self.gripper = self.robot.get_gripper()
 
     def get_qpos(self):
         state = self.robot.read_once()
@@ -45,14 +45,9 @@ class RealEnv:
     def get_images(self):
         return self.image_recorder.get_images()
 
-    def set_gripper_pose(self, left_gripper_desired_pos_normalized, right_gripper_desired_pos_normalized):
-        left_gripper_desired_joint = PUPPET_GRIPPER_JOINT_UNNORMALIZE_FN(left_gripper_desired_pos_normalized)
-        self.gripper_command.cmd = left_gripper_desired_joint
-        self.puppet_bot_left.gripper.core.pub_single.publish(self.gripper_command)
-
-        right_gripper_desired_joint = PUPPET_GRIPPER_JOINT_UNNORMALIZE_FN(right_gripper_desired_pos_normalized)
-        self.gripper_command.cmd = right_gripper_desired_joint
-        self.puppet_bot_right.gripper.core.pub_single.publish(self.gripper_command)
+    def set_gripper(self, pos):
+        
+            self.gripper.move(pos)
 
     def _reset_joints(self):
         reset_position = START_ARM_POSE[:6]
