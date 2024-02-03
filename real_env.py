@@ -3,7 +3,11 @@ import numpy as np
 import collections
 import matplotlib.pyplot as plt
 from argparse import ArgumentParser
+import math
 from frankx import Affine, JointMotion, LinearMotion, Robot
+
+HANDLOAD = [0.0, 0.0, -2.9]
+START_ARM_POSE = [-1.811944, 1.179108, 1.757100, -2.14162, -1.143369, 1.633046, -0.432171]
 
 class RealEnv:
     """
@@ -21,6 +25,9 @@ class RealEnv:
             self.robot.set_default_behavior()
             self.robot.recover_from_errors()
             self.robot.set_dynamic_rel(dyn_rel)
+        self.time_sec = 0
+        self.start_time = 0
+        self.now_time = 0
 
     def setup_robots(self):
         parser = ArgumentParser()
@@ -39,16 +46,7 @@ class RealEnv:
     
     def get_force(self):
         state = self.robot.read_once()
-        
-        return 
-
-    def get_images(self):
-        return self.image_recorder.get_images()
-
-    def set_gripper(self, pos):
-        
-            self.gripper.move(pos)
-        _Gravity = np.array([0.0, 0.0, -2.9])
+        _Gravity = np.array(HANDLOAD)
         full_matrix = np.array(state.O_T_EE).reshape(4, 4)  # 假设 O_T_EE 是一个长度为 16 的列表或数组
         rotation_matrix = full_matrix[0:3, 0:3]
         GinF = rotation_matrix.T @ _Gravity
@@ -58,120 +56,90 @@ class RealEnv:
         state.K_F_ext_hat_K[1] + GinF[1],
         state.K_F_ext_hat_K[2] + GinF[2]
         ])
-
         force_in_world = rotation_matrix @ compensated_force
         return force_in_world
+    
+    def set_gripper(self, pos):
+        pos = abs(pos)
+        if pos > 0.085:
+            pos = 0.085
+        self.gripper.move(pos)
 
-    def set_gripper(self, left_gripper_desired_pos_normalized, right_gripper_desired_pos_normalized):
+    def reset_joints(self):
+        reset_position = START_ARM_POSE
+        self.robot.move(JointMotion(reset_position))
 
-    def _reset_joints(self):
-        reset_position = START_ARM_POSE[:6]
-        move_arms([self.puppet_bot_left, self.puppet_bot_right], [reset_position, reset_position], move_time=1)
+    def reset_gripper(self):
+        self.gripper.move(0.085)
 
-    def _reset_gripper(self):
-        """Set to position mode and do position resets: first open then close. Then change back to PWM mode"""
-        move_grippers([self.puppet_bot_left, self.puppet_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, move_time=0.5)
-        move_grippers([self.puppet_bot_left, self.puppet_bot_right], [PUPPET_GRIPPER_JOINT_CLOSE] * 2, move_time=1)
+    def get_observation(self, state):
+        if state == None:
+            state = self.robot.read_once()
+        _Gravity = np.array(HANDLOAD)
+        full_matrix = np.array(state.O_T_EE).reshape(4, 4)  
+        rotation_matrix = full_matrix[0:3, 0:3]
+        GinF = rotation_matrix.T @ _Gravity
 
-    def get_observation(self):
+        compensated_force = np.array([
+        state.K_F_ext_hat_K[0] + GinF[0],
+        state.K_F_ext_hat_K[1] + GinF[1],
+        state.K_F_ext_hat_K[2] + GinF[2]
+        ])
+        force_in_world = rotation_matrix @ compensated_force
+
         obs = collections.OrderedDict()
-        obs['qpos'] = self.get_qpos()
-        obs['qvel'] = self.get_qvel()
-        obs['effort'] = self.get_effort()
-        obs['images'] = self.get_images()
+        obs['qpos'] = state.q
+        obs['force'] = force_in_world
+        obs['cut_height'] = state.O_T_EE[14]
         return obs
 
-    def get_reward(self):
+    def get_reward(self, state):
+        if state == None:
+            state = self.robot.read_once()
         return 0
 
-    def reset(self, fake=False):
-        if not fake:
-            # Reboot puppet robot gripper motors
-            self.puppet_bot_left.dxl.robot_reboot_motors("single", "gripper", True)
-            self.puppet_bot_right.dxl.robot_reboot_motors("single", "gripper", True)
-            self._reset_joints()
-            self._reset_gripper()
-        return dm_env.TimeStep(
-            step_type=dm_env.StepType.FIRST,
-            reward=self.get_reward(),
-            discount=None,
-            observation=self.get_observation())
+    def reset(self):
+        self.start_time = time.time()
+        self.reset_joints()
+        observation=self.get_observation()
+        info = {}
+        return observation, info
+
+    def is_terminal(self, state):
+        status = True
+        # 切水果切到最底部
+        if state.O_T_EE[14] < 0.05:
+            state = False
+        return status 
+
+    def is_truncated(self, state):
+        x_force = state.K_F_ext_hat_K[0]
+        y_force = state.K_F_ext_hat_K[1]
+        z_force = state.K_F_ext_hat_K[2]
+        force_magnitude = math.sqrt(x_force**2 + y_force**2 + z_force**2)
+        
+        self.now_time = time.time()
+        self.time_sec = self.now_time - self.start_time
+        # force > 20 or time > 120s
+        if force_magnitude > 20 or self.time_sec > 120:
+            return True
+        return False
 
     def step(self, action):
-        state_len = int(len(action) / 2)
-        left_action = action[:state_len]
-        right_action = action[state_len:]
-        self.puppet_bot_left.arm.set_joint_positions(left_action[:6], blocking=False)
-        self.puppet_bot_right.arm.set_joint_positions(right_action[:6], blocking=False)
-        self.set_gripper_pose(left_action[-1], right_action[-1])
-        time.sleep(DT)
-        return dm_env.TimeStep(
-            step_type=dm_env.StepType.MID,
-            reward=self.get_reward(),
-            discount=None,
-            observation=self.get_observation())
+        # execute action
+        self.robot.move(JointMotion(action))
+        # get info
+        state = self.robot.read_once()
+        observation = self.get_observation(state)
+        reward=self.get_reward(state)
+        terminated = self.is_terminal(state)
+        truncated = self.is_truncated(state)
+        info = {}
+        return observation, reward, terminated, truncated, info
 
+    def close(self):
+        print("Closing the environment")
 
-def get_action(master_bot_left, master_bot_right):
-    action = np.zeros(14) # 6 joint + 1 gripper, for two arms
-    # Arm actions
-    action[:6] = master_bot_left.dxl.joint_states.position[:6]
-    action[7:7+6] = master_bot_right.dxl.joint_states.position[:6]
-    # Gripper actions 
-    action[6] = MASTER_GRIPPER_JOINT_NORMALIZE_FN(master_bot_left.dxl.joint_states.position[6])
-    action[7+6] = MASTER_GRIPPER_JOINT_NORMALIZE_FN(master_bot_right.dxl.joint_states.position[6])
-
-    return action
-
-
-def make_real_env(init_node, setup_robots=True):
-    env = RealEnv(init_node, setup_robots)
-    return env
-
-
-def test_real_teleop():
-    """
-    Test bimanual teleoperation and show image observations onscreen.
-    It first reads joint poses from both master arms.
-    Then use it as actions to step the environment.
-    The environment returns full observations including images.
-
-    An alternative approach is to have separate scripts for teleoperation and observation recording.
-    This script will result in higher fidelity (obs, action) pairs
-    """
-
-    onscreen_render = True
-    render_cam = 'cam_left_wrist'
-
-    # source of data
-    master_bot_left = InterbotixManipulatorXS(robot_model="wx250s", group_name="arm", gripper_name="gripper",
-                                              robot_name=f'master_left', init_node=True)
-    master_bot_right = InterbotixManipulatorXS(robot_model="wx250s", group_name="arm", gripper_name="gripper",
-                                               robot_name=f'master_right', init_node=False)
-    setup_master_bot(master_bot_left)
-    setup_master_bot(master_bot_right)
-
-    # setup the environment
-    env = make_real_env(init_node=False)
-    ts = env.reset(fake=True)
-    episode = [ts]
-    # setup visualization
-    if onscreen_render:
-        ax = plt.subplot()
-        plt_img = ax.imshow(ts.observation['images'][render_cam])
-        plt.ion()
-
-    for t in range(1000):
-        action = get_action(master_bot_left, master_bot_right)
-        ts = env.step(action)
-        episode.append(ts)
-
-        if onscreen_render:
-            plt_img.set_data(ts.observation['images'][render_cam])
-            plt.pause(DT)
-        else:
-            time.sleep(DT)
-
-
-if __name__ == '__main__':
-    test_real_teleop()
+# check time_sec
+# check force_magnitude
+# check cut_height

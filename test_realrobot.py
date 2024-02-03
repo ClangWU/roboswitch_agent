@@ -13,6 +13,7 @@ if __name__ == '__main__':
     robot.recover_from_errors()
     robot.set_dynamic_rel(0.15)
 
+    
     # Joint motion
     robot.move(JointMotion([-1.811944, 1.179108, 1.757100, -2.14162, -1.143369, 1.633046, -0.432171]))
 
