@@ -5,9 +5,7 @@ import matplotlib.pyplot as plt
 from argparse import ArgumentParser
 import math
 from frankx import Affine, JointMotion, LinearMotion, Robot
-
-HANDLOAD = [0.0, 0.0, -2.9]
-START_ARM_POSE = [-1.811944, 1.179108, 1.757100, -2.14162, -1.143369, 1.633046, -0.432171]
+from constants import HANDLOAD, START_ARM_POSE
 
 class RealEnv:
     """

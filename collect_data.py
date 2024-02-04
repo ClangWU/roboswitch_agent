@@ -59,7 +59,7 @@ def collect_bc_demonstrations(env, actor, num_episodes, observations_csv, action
         f.write('observation\n')
     with open(actions_csv, 'w') as f:
         f.write('action\n')
-
+    
     observations_df.to_csv(observations_csv, index=False, mode=mode, header=flag)
     actions_df.to_csv(actions_csv, index=False, mode=mode, header=flag)
 
