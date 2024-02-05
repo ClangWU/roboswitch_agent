@@ -218,7 +218,7 @@ if __name__ == '__main__':
                   pbar.update(1)
                   pbar.set_postfix(reward=reward)
                   if terminated:
-                      
+                      env.auto_finish()
                       break
                   if truncated:
                       break

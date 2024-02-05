@@ -5,15 +5,16 @@ import matplotlib.pyplot as plt
 from argparse import ArgumentParser
 import math
 from frankx import Affine, JointMotion, LinearMotion, Robot
-from constants import HANDLOAD, START_ARM_POSE
+from constants import HANDLOAD, START_ARM_POSE, END_ARM_POSE
 
 class RealEnv:
     """
     Environment for real robot
     Action space:       panda_joint (7)                # absolute joint position
                       
-    Observation space: {"qpos": panda_joint (7),   # absolute joint position  (rad)
-                        "wrench":  force(3)         # absolute joint velocity (rad)}
+    Observation space: {"qpos": panda_joint (7),     # absolute joint position  (rad)
+                        "wrench":  force(3)          # force  (N)
+                        "cut_height": cut_height (1) # cut height (m)}
     """
 
     def __init__(self, dyn_rel=0.15, setup_robots=True):
@@ -134,6 +135,9 @@ class RealEnv:
         truncated = self.is_truncated(state)
         info = {}
         return observation, reward, terminated, truncated, info
+
+    def auto_finish(self):
+        self.robot.move(LinearMotion(END_ARM_POSE))
 
     def close(self):
         print("Closing the environment")
