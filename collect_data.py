@@ -108,9 +108,10 @@ def collect_dp_demonstrations(env, actor, num_episodes, observations_csv, action
             combined_observation = observation["observation"][0:3].tolist() + observation["desired_goal"][0:3].tolist()
             _obs = combined_observation*1000
             observations_data['observation'].append(_obs)
-            observation, reward, terminated, truncated, info = env.step(action)
             _act = action*1000
             actions_data['action'].append(_act.tolist())
+            observation, reward, terminated, truncated, info = env.step(action)
+
             score += reward
             iters += 1
             if terminated == True:

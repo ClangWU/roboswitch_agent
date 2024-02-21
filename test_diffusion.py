@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import collections
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
 from tqdm.auto import tqdm
@@ -18,7 +19,7 @@ import numpy as np
 import gymnasium as gym
 import panda_gym
 import matplotlib.pyplot as plt
-
+import time
 def get_env_info():
     env = gym.make('PandaReach-v3', render_mode="human")
     obs_dim = env.observation_space["observation"].shape
@@ -28,8 +29,9 @@ def get_env_info():
     return obs_dim, action_dim
 
 if __name__ == '__main__':
+    is_cpu = False
     load_pretrained = True
-    n_games = 20
+    n_games = 10
     # parameters
     # 预测步长
     pred_horizon = 16
@@ -42,9 +44,9 @@ if __name__ == '__main__':
     n_epochs = 100
     alpha = 0.001
     scores_list = []
-    actions_path = "./data/dp_actions.csv"
-    states_path = "./data/dp_observations.csv"
-    episode_ends_path = "./data/dp_episode_ends.csv"
+    actions_path = "./data/dp/dp_actions.csv"
+    states_path = "./data/dp/dp_observations.csv"
+    episode_ends_path = "./data/dp/dp_episode_ends.csv"
     dataset = ds.FrankaDataset(
         actions_path, states_path, episode_ends_path,
         pred_horizon, obs_horizon, action_horizon)
@@ -100,7 +102,7 @@ if __name__ == '__main__':
     denoised_action = noised_action - noise
 
     # for this demo, we use DDPMScheduler with 100 diffusion iterations
-    # 
+    # 推理迭代次数
     num_diffusion_iters = 100
     noise_scheduler = DDPMScheduler(
         num_train_timesteps=num_diffusion_iters,
@@ -115,7 +117,10 @@ if __name__ == '__main__':
 
     # device transfer
     # move network to GPU
-    device = torch.device('cuda')
+    if is_cpu:
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda')
     _ = noise_pred_net.to(device)
     num_epochs = 100
 
@@ -128,11 +133,16 @@ if __name__ == '__main__':
         power=0.75)
 
     if load_pretrained:
-      ckpt_path = "./tmp/dp/noise_pred_net.pt"
+      ckpt_path = "./tmp/dp/ddim_noise_pred_net.pt"
       # if not os.path.isfile(ckpt_path):
       #     id = "1mHDr_DEZSdiGo9yecL50BBQYzR8Fjhl_&confirm=t"
       #     gdown.download(id=id, output=ckpt_path, quiet=False)
-      state_dict = torch.load(ckpt_path, map_location='cuda')
+      if is_cpu:
+            state_dict = torch.load(ckpt_path, map_location='cpu') 
+            print('Use CPU')
+      else:
+            state_dict = torch.load(ckpt_path, map_location='cuda')
+            print('Use GPU')
       ema_noise_pred_net = noise_pred_net
       ema_noise_pred_net.load_state_dict(state_dict)
       print('Pretrained weights loaded.')
@@ -141,7 +151,7 @@ if __name__ == '__main__':
 
     #@markdown ### **Inference**
     # limit enviornment interaction to 200 steps before termination
-    max_steps = 200
+    max_steps = 300
     env = gym.make('PandaReach-v3', render_mode="human")
     # use a seed >200 to avoid initial states seen in the training dataset
     
@@ -166,7 +176,7 @@ if __name__ == '__main__':
               nobs = ds.normalize_data(obs_seq, stats=stats['obs'])
               # device transfer
               nobs = torch.from_numpy(nobs).to(device, dtype=torch.float32)
-
+              time1 = time.time()
               # infer action
               with torch.no_grad():
                   # reshape observation to (B,obs_horizon*obs_dim)
@@ -212,10 +222,16 @@ if __name__ == '__main__':
               # execute action_horizon number of steps
               # 执行8个动作，不需要重新规划
               # without replanning
+              time2 = time.time()
+              delta = time2 - time1
+            #   print("delta",delta)
+                
               for i in range(len(action)):
                   # print('action', action[i], 'step', step_idx, 'i', i)
                   # stepping env
+                  
                   observation, reward, done, _, info = env.step(action[i])
+                #   print("time2",time.time())
                   obs = observation["observation"][0:3].tolist() + observation["desired_goal"][0:3].tolist()
 
                   # save observations

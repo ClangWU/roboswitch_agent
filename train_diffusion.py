@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import collections
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
 from tqdm.auto import tqdm
@@ -38,9 +39,9 @@ if __name__ == '__main__':
     batch_size = 256
     n_epochs = 100
     alpha = 0.001
-    actions_path = "./data/dp_actions.csv"
-    states_path = "./data/dp_observations.csv"
-    episode_ends_path = "./data/dp_episode_ends.csv"
+    actions_path = "./data/dp/dp_actions.csv"
+    states_path = "./data/dp/dp_observations.csv"
+    episode_ends_path = "./data/dp/dp_episode_ends.csv"
     dataset = ds.FrankaDataset(
         actions_path, states_path, episode_ends_path,
         pred_horizon, obs_horizon, action_horizon)
@@ -205,4 +206,4 @@ if __name__ == '__main__':
         ema.copy_to(ema_noise_pred_net.parameters())
 
         # save model
-        torch.save(ema_noise_pred_net.state_dict(), "./tmp/dp/noise_pred_net.pt")
+        torch.save(ema_noise_pred_net.state_dict(), "./tmp/dp/ddim_act4_noise_pred_net.pt")
