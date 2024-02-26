@@ -4,8 +4,8 @@ import collections
 import matplotlib.pyplot as plt
 from argparse import ArgumentParser
 import math
-from frankx import Affine, JointMotion, LinearMotion, Robot
 from constants import HANDLOAD, START_ARM_POSE, END_ARM_POSE
+
 
 class RealEnv:
     """
@@ -32,7 +32,6 @@ class RealEnv:
         parser = ArgumentParser()
         parser.add_argument('--host', default='192.168.1.100', help='FCI IP of the robot')
         args = parser.parse_args()
-        self.robot = Robot(args.host)
         self.gripper = self.robot.get_gripper()
 
     def get_qpos(self):
@@ -63,10 +62,6 @@ class RealEnv:
         if pos > 0.085:
             pos = 0.085
         self.gripper.move(pos)
-
-    def reset_joints(self):
-        reset_position = START_ARM_POSE
-        self.robot.move(JointMotion(reset_position))
 
     def reset_gripper(self):
         self.gripper.move(0.085)
