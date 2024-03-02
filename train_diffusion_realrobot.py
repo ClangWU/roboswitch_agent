@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import collections
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
 from tqdm.auto import tqdm
@@ -15,7 +16,6 @@ from algorithm.dp.noisenet import ConditionalUnet1D
 import algorithm.dp.dataset as ds
 from huggingface_hub.utils import IGNORE_GIT_FOLDER_PATTERNS
 import numpy as np
-import real_env
 if __name__ == '__main__':
     
     # parameters
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     print("batch['action'].shape", batch['action'].shape)
 
     # observation and action dimensions corrsponding to
-    obs_dim = 3+1+7
+    obs_dim = 3+7
     action_dim = 7
 
     # 网络接收动作维度作为输入，并将观测维度乘以观测时间范围作为全局条件
@@ -86,10 +86,10 @@ if __name__ == '__main__':
     # 生成去噪声动作
     denoised_action = noised_action - noise
 
-    # for this demo, we use DDPMScheduler with 100 diffusion iterations
+    # for this demo, we use DDIMScheduler with 100 diffusion iterations
     # 
     num_diffusion_iters = 100
-    noise_scheduler = DDPMScheduler(
+    noise_scheduler = DDIMScheduler(
         num_train_timesteps=num_diffusion_iters,
         # the choise of beta schedule has big impact on performance
         # we found squared cosine works the best

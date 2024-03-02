@@ -1,50 +1,38 @@
 import zmq
 import json
 import time
-def zmq_action(socket):
-    # print(time.time())
-    # context = zmq.Context()
-    # socket = context.socket(zmq.REP)
-    # socket.bind("tcp://*:5555")  # 绑定端口5555
-    # print(time.time())
-
-    print("Server is running...")
-    # 等待客户端消息
+def zmq_action(socket, action):
     message = socket.recv_string()
-    print(message)
-    float_array = [0.05, 0.01, 0.01, 0.99993896484375, -0.0021783041302114725, -0.0061051067896187305, -0.008672064170241356]
     # 将浮点数数组编码为JSON字符串
-    message = json.dumps(float_array)
+    message = json.dumps(action)
     socket.send_string(message)
 
 def zmq_obs(socket):
-
-    # 定义一个浮点数数组
-    # float_array = [1.1, 2.2, 3.3]
-    # 将浮点数数组编码为JSON字符串
     message = "get obs"
     socket.send_string(message)
-    print(time.time())
 
     # 等待服务器响应
     reply = socket.recv_string()
-    print(f"Received obs: {reply}")
-    print(time.time())
-
+    obs = json.loads(reply)
+    return obs
 
 if __name__ == "__main__":
-    context = zmq.Context()
-    rep = context.socket(zmq.REP)
+    context_rep = zmq.Context()
+    rep = context_rep.socket(zmq.REP)
     rep.bind("tcp://*:5555")  # 绑定端口5555
 
-    context = zmq.Context()
+    context_req = zmq.Context()
     print("Connecting to server...")
-    req = context.socket(zmq.REQ)
+    req = context_req.socket(zmq.REQ)
     req.connect("tcp://192.168.1.101:5555")  # 连接到服务器
+
+    action = [0.00351818, 0.00524153, -0.0130234, -0.000813822, 0.999987, 0.00422609, 0.00145553]
+
     while True:
-      zmq_action(rep)
+      zmq_action(rep, action)
+      aa = time.time()
       time.sleep(0.1)
-      zmq_obs(req)
+      a = zmq_obs(req)
 
 # import zmq
 # import time

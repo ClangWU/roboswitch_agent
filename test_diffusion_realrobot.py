@@ -20,13 +20,36 @@ import gymnasium as gym
 import panda_gym
 import matplotlib.pyplot as plt
 import time
-def get_env_info():
-    env = gym.make('PandaReach-v3', render_mode="human")
-    obs_dim = env.observation_space["observation"].shape
-    action_dim = env.action_space.shape[0]
-    env.close()
-    print(obs_dim, action_dim)
-    return obs_dim, action_dim
+import zmq
+import json
+import time
+def zmq_action(socket, action):
+    # print(time.time())
+    # context = zmq.Context()
+    # socket = context.socket(zmq.REP)
+    # socket.bind("tcp://*:5555")  # 绑定端口5555
+    # print(time.time())
+    # 等待客户端消息
+    message = socket.recv_string()
+    print(message)
+    # 将浮点数数组编码为JSON字符串
+    message = json.dumps(action)
+    socket.send_string(message)
+
+def zmq_obs(socket):
+
+    # 定义一个浮点数数组
+    # float_array = [1.1, 2.2, 3.3]
+    # 将浮点数数组编码为JSON字符串
+    message = "get obs"
+    socket.send_string(message)
+    print(time.time())
+
+    # 等待服务器响应
+    reply = socket.recv_string()
+    print(f"Received obs: {reply}")
+    print(time.time())
+
 
 if __name__ == '__main__':
     is_cpu = False
@@ -39,14 +62,23 @@ if __name__ == '__main__':
     obs_horizon = 2
     # 动作步长
     action_horizon = 8
-    obs_dim, action_dim = get_env_info()
+    obs_dim, action_dim = 10, 7
     batch_size = 256
     n_epochs = 100
     alpha = 0.001
+    context_rep = zmq.Context()
+    rep = context_rep.socket(zmq.REP)
+    rep.bind("tcp://*:5555")  # 绑定端口5555
+
+    context_req = zmq.Context()
+    print("Connecting to server...")
+    req = context_req.socket(zmq.REQ)
+    req.connect("tcp://192.168.1.101:5555")  # 连接到服务器
+
     scores_list = []
-    actions_path = "./data/dp/dp_actions.csv"
-    states_path = "./data/dp/dp_observations.csv"
-    episode_ends_path = "./data/dp/dp_episode_ends.csv"
+    actions_path = "./data/realrobot/actions.csv"
+    states_path = "./data/realrobot/observations.csv"
+    episode_ends_path = "./data/realrobot/episode_ends.csv"
     dataset = ds.FrankaDataset(
         actions_path, states_path, episode_ends_path,
         pred_horizon, obs_horizon, action_horizon)
@@ -66,10 +98,6 @@ if __name__ == '__main__':
     batch = next(iter(dataloader))
     print("batch['obs'].shape:", batch['obs'].shape)
     print("batch['action'].shape", batch['action'].shape)
-
-    # observation and action dimensions corrsponding to
-    obs_dim = 6
-    action_dim = 3
 
     # 网络接收动作维度作为输入，并将观测维度乘以观测时间范围作为全局条件
     # create network object
@@ -103,8 +131,8 @@ if __name__ == '__main__':
 
     # for this demo, we use DDPMScheduler with 100 diffusion iterations
     # 推理迭代次数
-    num_diffusion_iters = 100
-    noise_scheduler = DDPMScheduler(
+    num_diffusion_iters = 25
+    noise_scheduler = DDIMScheduler(
         num_train_timesteps=num_diffusion_iters,
         # the choise of beta schedule has big impact on performance
         # we found squared cosine works the best
@@ -121,7 +149,7 @@ if __name__ == '__main__':
     _ = noise_pred_net.to(device)
 
     if load_pretrained:
-        ckpt_path = "./tmp/dp/ddim_noise_pred_net.pt"
+        ckpt_path = "./tmp/realrobot/cutting_noise_pred_net.pt"
         state_dict = torch.load(ckpt_path, map_location='cuda')
         ema_noise_pred_net = noise_pred_net
         ema_noise_pred_net.load_state_dict(state_dict)
@@ -138,10 +166,9 @@ if __name__ == '__main__':
     for id in range(n_games):
       # get first observation
       observation, info = env.reset()
-      obs = observation["observation"][0:3].tolist() + observation["desired_goal"][0:3].tolist()
       # keep a queue of last 2 steps of observations
       obs_deque = collections.deque(
-          [obs] * obs_horizon, maxlen=obs_horizon)
+          [observation] * obs_horizon, maxlen=obs_horizon)
       # save visualization and rewards
       rewards = list()
       done = False
@@ -210,12 +237,14 @@ if __name__ == '__main__':
                   # print('action', action[i], 'step', step_idx, 'i', i)
                   # stepping env
                   
+                  zmq_action(rep)
+
                   observation, reward, done, _, info = env.step(action[i])
                 #   print("time2",time.time())
-                  obs = observation["observation"][0:3].tolist() + observation["desired_goal"][0:3].tolist()
+                  time.sleep(0.1)
 
                   # save observations
-                  obs_deque.append(obs)
+                  obs_deque.append(observation)
                   # and reward/vis
                   score += reward
                   rewards.append(reward)
@@ -233,15 +262,3 @@ if __name__ == '__main__':
 
     env.close()
     games = list(range(1, n_games + 1))
-
-    # 绘制得分曲线图
-    plt.figure(figsize=(10, 6))
-    plt.plot(games, scores_list, marker='o', color='b')
-    plt.title('Scores over Games')
-    plt.xlabel('Game Number')
-    plt.ylabel('Score')
-    plt.grid(True)
-    plt.xticks(games)
-    plt.savefig('./plots/dp/dp.png')
-    plt.show()
-

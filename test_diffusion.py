@@ -103,8 +103,8 @@ if __name__ == '__main__':
 
     # for this demo, we use DDPMScheduler with 100 diffusion iterations
     # 推理迭代次数
-    num_diffusion_iters = 100
-    noise_scheduler = DDPMScheduler(
+    num_diffusion_iters = 16
+    noise_scheduler = DDIMScheduler(
         num_train_timesteps=num_diffusion_iters,
         # the choise of beta schedule has big impact on performance
         # we found squared cosine works the best
