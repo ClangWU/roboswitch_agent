@@ -20,11 +20,11 @@ if __name__ == '__main__':
     
     # parameters
     # 预测步长
-    pred_horizon = 16
+    pred_horizon = 8
     # 观测步长 
     obs_horizon = 2
     # 动作步长
-    action_horizon = 8
+    action_horizon = 4
 
     batch_size = 256
     n_epochs = 100
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     # move network to GPU
     device = torch.device('cuda')
     _ = noise_pred_net.to(device)
-    num_epochs = 100
+    num_epochs = 200
 
     # Exponential Moving Average
     # accelerates training and improves stability
@@ -196,4 +196,4 @@ if __name__ == '__main__':
         ema.copy_to(ema_noise_pred_net.parameters())
 
         # save model
-        torch.save(ema_noise_pred_net.state_dict(), "./tmp/realrobot/cutting_noise_pred_net.pt")
+        torch.save(ema_noise_pred_net.state_dict(), "./tmp/realrobot/cutting200_824_noise_pred_net.pt")

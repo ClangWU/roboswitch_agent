@@ -21,12 +21,12 @@ if __name__ == '__main__':
     # print(obs_shape)
     agent = BC_Agent(n_actions=action_dim, 
                     input_dims=obs_dim, batch_size=batch_size,
-                    n_epochs=n_epochs)
+                    n_epochs=n_epochs, chkpt_dir='./tmp/bc')
 
     # # # Train the behavioral cloning model
     model = agent.train_behavioral_cloning(
-        './data/bc_observations.csv', 
-        './data/bc_actions.csv')
+        './data/bc/bc_observations.csv', 
+        './data/bc/bc_actions.csv')
     agent.save_models()
 
     agent.load_models()

@@ -47,11 +47,11 @@ class BCNetwork(nn.Module):
         self.load_state_dict(torch.load(self.checkpoint_file))
 
 class BC_Agent:
-    def __init__(self, n_actions, input_dims, alpha=0.001, fc1_dims=128, fc2_dims=256, batch_size=64, n_epochs=10):
+    def __init__(self, n_actions, input_dims, alpha=0.001, fc1_dims=128, fc2_dims=256, batch_size=64, n_epochs=10, chkpt_dir='./tmp/bc'):
         self.n_epochs = n_epochs
         self.input_dims = input_dims
         self.batch_size = batch_size
-        self.bc = BCNetwork(n_actions, input_dims, alpha, fc1_dims, fc2_dims)
+        self.bc = BCNetwork(n_actions, input_dims, alpha, fc1_dims, fc2_dims, chkpt_dir)
 
     def take_action(self, observation):
         self.bc.eval()
@@ -90,8 +90,8 @@ class BC_Agent:
 
         # scale 把 observation 和 action 都放大1000倍
         # 执行的时候环境的obseration放大1000倍丢给bc，bc输出的action再缩小1000倍 
-        observations = torch.tensor(list(observations), dtype=torch.float32, requires_grad=True).to(self.bc.device)*1000
-        actions = torch.tensor(list(actions), dtype=torch.float32, requires_grad=True).to(self.bc.device)*1000
+        observations = torch.tensor(list(observations), dtype=torch.float32, requires_grad=True).to(self.bc.device)
+        actions = torch.tensor(list(actions), dtype=torch.float32, requires_grad=True).to(self.bc.device)
 
         dataloader = DataLoader(TensorDataset(observations, actions), batch_size=self.batch_size, shuffle=True)
 

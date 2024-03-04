@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
     # for this demo, we use DDPMScheduler with 100 diffusion iterations
     # 推理迭代次数
-    num_diffusion_iters = 16
+    num_diffusion_iters = 50
     noise_scheduler = DDIMScheduler(
         num_train_timesteps=num_diffusion_iters,
         # the choise of beta schedule has big impact on performance
@@ -134,6 +134,7 @@ if __name__ == '__main__':
 
     if load_pretrained:
       ckpt_path = "./tmp/dp/ddim_noise_pred_net.pt"
+    #   ckpt_path = "./tmp/dp/ddim_22_noise_pred_net.pt"
       # if not os.path.isfile(ckpt_path):
       #     id = "1mHDr_DEZSdiGo9yecL50BBQYzR8Fjhl_&confirm=t"
       #     gdown.download(id=id, output=ckpt_path, quiet=False)
@@ -242,7 +243,7 @@ if __name__ == '__main__':
                   # update progress bar
                   step_idx += 1
                   pbar.update(1)
-                  pbar.set_postfix(reward=reward)
+                #   pbar.set_postfix(reward=reward)
                   if step_idx > max_steps:
                       done = True
                   if done:

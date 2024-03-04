@@ -39,9 +39,9 @@ if __name__ == '__main__':
     batch_size = 256
     n_epochs = 100
     alpha = 0.001
-    actions_path = "./data/dp/dp_actions.csv"
-    states_path = "./data/dp/dp_observations.csv"
-    episode_ends_path = "./data/dp/dp_episode_ends.csv"
+    actions_path = "./data/dp/dp_actions_22.csv"
+    states_path = "./data/dp/dp_observations_22.csv"
+    episode_ends_path = "./data/dp/dp_episode_ends_22.csv"
     dataset = ds.FrankaDataset(
         actions_path, states_path, episode_ends_path,
         pred_horizon, obs_horizon, action_horizon)
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     # for this demo, we use DDPMScheduler with 100 diffusion iterations
     # 
     num_diffusion_iters = 100
-    noise_scheduler = DDPMScheduler(
+    noise_scheduler = DDIMScheduler(
         num_train_timesteps=num_diffusion_iters,
         # the choise of beta schedule has big impact on performance
         # we found squared cosine works the best
@@ -206,4 +206,4 @@ if __name__ == '__main__':
         ema.copy_to(ema_noise_pred_net.parameters())
 
         # save model
-        torch.save(ema_noise_pred_net.state_dict(), "./tmp/dp/ddim_act4_noise_pred_net.pt")
+        torch.save(ema_noise_pred_net.state_dict(), "./tmp/dp/ddim_22_noise_pred_net.pt")

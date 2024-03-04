@@ -26,14 +26,14 @@ if __name__ == "__main__":
     req = context_req.socket(zmq.REQ)
     req.connect("tcp://192.168.1.101:5555")  # 连接到服务器
 
-    action = [0.00351818, 0.00524153, -0.0130234, -0.000813822, 0.999987, 0.00422609, 0.00145553]
+    action = [-0.00112, 0.00223919, -0.0140587, -0.00446902, 0.999931, -0.00453232, -0.00958188]
 
     while True:
       zmq_action(rep, action)
       aa = time.time()
       time.sleep(0.1)
       a = zmq_obs(req)
-
+      print(a)
 # import zmq
 # import time
 # import threading

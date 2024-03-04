@@ -106,10 +106,8 @@ def collect_dp_demonstrations(env, actor, num_episodes, observations_csv, action
             # Compute control action using the PID controller
             action = pid_controller.compute_action(error)
             combined_observation = observation["observation"][0:3].tolist() + observation["desired_goal"][0:3].tolist()
-            _obs = combined_observation*1000
-            observations_data['observation'].append(_obs)
-            _act = action*1000
-            actions_data['action'].append(_act.tolist())
+            observations_data['observation'].append(combined_observation)
+            actions_data['action'].append(action.tolist())
             observation, reward, terminated, truncated, info = env.step(action)
 
             score += reward
@@ -153,13 +151,13 @@ if __name__ == '__main__':
     actor = None
     algo = 'dp'
     # Define the number of expert episodes and the CSV filename
-    num_episodes = 100
+    num_episodes = 30
     if algo is 'bc':
         collect_bc_demonstrations(env, actor, num_episodes,        
             './data/bc_observations.csv', 
             './data/bc_actions.csv')
     elif algo is 'dp':
         collect_dp_demonstrations(env, actor, num_episodes,        
-            './data/dp_observations.csv', 
-            './data/dp_actions.csv',
-            './data/dp_episode_ends.csv')
+            './data/dp/dp_observations_22.csv', 
+            './data/dp/dp_actions_22.csv',
+            './data/dp/dp_episode_ends_22.csv')

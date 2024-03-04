@@ -16,45 +16,29 @@ from algorithm.dp.noisenet import ConditionalUnet1D
 import algorithm.dp.dataset as ds
 from huggingface_hub.utils import IGNORE_GIT_FOLDER_PATTERNS
 import numpy as np
-import gymnasium as gym
-import panda_gym
 import matplotlib.pyplot as plt
 import time
 import zmq
 import json
 import time
 def zmq_action(socket, action):
-    # print(time.time())
-    # context = zmq.Context()
-    # socket = context.socket(zmq.REP)
-    # socket.bind("tcp://*:5555")  # 绑定端口5555
-    # print(time.time())
-    # 等待客户端消息
     message = socket.recv_string()
-    print(message)
+    action_list = action.tolist()
     # 将浮点数数组编码为JSON字符串
-    message = json.dumps(action)
+    message = json.dumps(action_list)
     socket.send_string(message)
 
 def zmq_obs(socket):
-
-    # 定义一个浮点数数组
-    # float_array = [1.1, 2.2, 3.3]
-    # 将浮点数数组编码为JSON字符串
     message = "get obs"
     socket.send_string(message)
-    print(time.time())
-
     # 等待服务器响应
     reply = socket.recv_string()
-    print(f"Received obs: {reply}")
-    print(time.time())
-
+    obs = json.loads(reply)
+    return obs
 
 if __name__ == '__main__':
     is_cpu = False
     load_pretrained = True
-    n_games = 10
     # parameters
     # 预测步长
     pred_horizon = 16
@@ -66,6 +50,7 @@ if __name__ == '__main__':
     batch_size = 256
     n_epochs = 100
     alpha = 0.001
+
     context_rep = zmq.Context()
     rep = context_rep.socket(zmq.REP)
     rep.bind("tcp://*:5555")  # 绑定端口5555
@@ -74,6 +59,8 @@ if __name__ == '__main__':
     print("Connecting to server...")
     req = context_req.socket(zmq.REQ)
     req.connect("tcp://192.168.1.101:5555")  # 连接到服务器
+
+    action_init = np.array([-0.00112, 0.00223919, -0.0140587, -0.00446902, 0.999931, -0.00453232, -0.00958188])
 
     scores_list = []
     actions_path = "./data/realrobot/actions.csv"
@@ -131,7 +118,7 @@ if __name__ == '__main__':
 
     # for this demo, we use DDPMScheduler with 100 diffusion iterations
     # 推理迭代次数
-    num_diffusion_iters = 25
+    num_diffusion_iters = 50
     noise_scheduler = DDIMScheduler(
         num_train_timesteps=num_diffusion_iters,
         # the choise of beta schedule has big impact on performance
@@ -149,7 +136,7 @@ if __name__ == '__main__':
     _ = noise_pred_net.to(device)
 
     if load_pretrained:
-        ckpt_path = "./tmp/realrobot/cutting_noise_pred_net.pt"
+        ckpt_path = "./tmp/realrobot/cutting1_noise_pred_net.pt"
         state_dict = torch.load(ckpt_path, map_location='cuda')
         ema_noise_pred_net = noise_pred_net
         ema_noise_pred_net.load_state_dict(state_dict)
@@ -159,106 +146,103 @@ if __name__ == '__main__':
 
     #@markdown ### **Inference**
     # limit enviornment interaction to 200 steps before termination
-    max_steps = 300
-    env = gym.make('PandaReach-v3', render_mode="human")
+    max_steps = 2000
     # use a seed >200 to avoid initial states seen in the training dataset
     
-    for id in range(n_games):
-      # get first observation
-      observation, info = env.reset()
-      # keep a queue of last 2 steps of observations
-      obs_deque = collections.deque(
-          [observation] * obs_horizon, maxlen=obs_horizon)
-      # save visualization and rewards
-      rewards = list()
-      done = False
-      step_idx = 0
-      score = 0
-      with tqdm(total=max_steps, desc="Franka Reach") as pbar:
-          while not done:
-              B = 1
-              # stack the last obs_horizon (2) number of observations
-              obs_seq = np.stack(obs_deque)
-              # normalize observation
-              nobs = ds.normalize_data(obs_seq, stats=stats['obs'])
-              # device transfer
-              nobs = torch.from_numpy(nobs).to(device, dtype=torch.float32)
-              time1 = time.time()
-              # infer action
-              with torch.no_grad():
-                  # reshape observation to (B,obs_horizon*obs_dim)
-                  obs_cond = nobs.unsqueeze(0).flatten(start_dim=1)
+    # get first observation
+    zmq_action(rep, action_init)
+    time.sleep(0.1)
+    a= time.time()
 
-                  # initialize action from Guassian noise
-                  noisy_action = torch.randn(
-                      (B, pred_horizon, action_dim), device=device)
-                  naction = noisy_action
+    observation = zmq_obs(req)
 
-                  # init scheduler
-                  noise_scheduler.set_timesteps(num_diffusion_iters)
+    print(time.time()-a)
+    # keep a queue of last 2 steps of observations
+    obs_deque = collections.deque(
+        [observation] * obs_horizon, maxlen=obs_horizon)
+    # save visualization and rewards
+    rewards = list()
+    done = False
+    step_idx = 0
+    score = 0
+    with tqdm(total=max_steps, desc="cutting") as pbar:
+        while not done:
+            B = 1
+            # stack the last obs_horizon (2) number of observations
+            obs_seq = np.stack(obs_deque)
+            # normalize observation
+            nobs = ds.normalize_data(obs_seq, stats=stats['obs'])
+            # device transfer
+            nobs = torch.from_numpy(nobs).to(device, dtype=torch.float32)
+            # time1 = time.time()
+            # infer action
+            with torch.no_grad():
+                # reshape observation to (B,obs_horizon*obs_dim)
+                obs_cond = nobs.unsqueeze(0).flatten(start_dim=1)
 
-                  for k in noise_scheduler.timesteps:
-                      # predict noise
-                      noise_pred = ema_noise_pred_net(
-                          sample=naction,
-                          timestep=k,
-                          global_cond=obs_cond
-                      )
+                # initialize action from Guassian noise
+                noisy_action = torch.randn(
+                    (B, pred_horizon, action_dim), device=device)
+                naction = noisy_action
 
-                      # inverse diffusion step (remove noise)
-                      naction = noise_scheduler.step(
-                          model_output=noise_pred,
-                          timestep=k,
-                          sample=naction
-                      ).prev_sample
+                # init scheduler
+                noise_scheduler.set_timesteps(num_diffusion_iters)
 
-              # unnormalize action
-              naction = naction.detach().to('cpu').numpy()
-              # (B, pred_horizon, action_dim)
-              naction = naction[0]
-              # 将归一化的动作转换为原始动作
-              action_pred = ds.unnormalize_data(naction, stats=stats['action'])
+                for k in noise_scheduler.timesteps:
+                    # predict noise
+                    noise_pred = ema_noise_pred_net(
+                        sample=naction,
+                        timestep=k,
+                        global_cond=obs_cond
+                    )
 
-              # only take action_horizon number of actions
-              # 看着论文就知道下面的顺序是怎么来的了
-              start = obs_horizon - 1
-              end = start + action_horizon
-              action = action_pred[start:end,:]
-              # (action_horizon, action_dim)
+                    # inverse diffusion step (remove noise)
+                    naction = noise_scheduler.step(
+                        model_output=noise_pred,
+                        timestep=k,
+                        sample=naction
+                    ).prev_sample
 
-              # execute action_horizon number of steps
-              # 执行8个动作，不需要重新规划
-              # without replanning
-              time2 = time.time()
-              delta = time2 - time1
-            #   print("delta",delta)
-                
-              for i in range(len(action)):
-                  # print('action', action[i], 'step', step_idx, 'i', i)
-                  # stepping env
-                  
-                  zmq_action(rep)
+            # unnormalize action
+            naction = naction.detach().to('cpu').numpy()
+            # (B, pred_horizon, action_dim)
+            naction = naction[0]
+            # 将归一化的动作转换为原始动作
+            action_pred = ds.unnormalize_data(naction, stats=stats['action'])
 
-                  observation, reward, done, _, info = env.step(action[i])
-                #   print("time2",time.time())
-                  time.sleep(0.1)
+            # only take action_horizon number of actions
+            # 看着论文就知道下面的顺序是怎么来的了
+            start = obs_horizon - 1
+            end = start + action_horizon
+            action = action_pred[start:end,:]
+            # (action_horizon, action_dim)
 
-                  # save observations
-                  obs_deque.append(observation)
-                  # and reward/vis
-                  score += reward
-                  rewards.append(reward)
-                  # update progress bar
-                  step_idx += 1
-                  pbar.update(1)
-                  pbar.set_postfix(reward=reward)
-                  if step_idx > max_steps:
-                      done = True
-                  if done:
-                      break
-      scores_list.append(score)
-      # print out the score
-      print('Game:', id+1, 'Score:', score)
+            # execute action_horizon number of steps
+            # 执行8个动作，不需要重新规划
+            # without replanning
+            # time2 = time.time()
+            # delta = time2 - time1
+        #   print("delta",delta)
+            
+            for i in range(len(action)):
+                # print('action', action[i], 'step', step_idx, 'i', i)
+                # stepping env
+                zmq_action(rep, action[i])
+                observation = zmq_obs(req)
+                time.sleep(0.1)
 
-    env.close()
-    games = list(range(1, n_games + 1))
+                if observation[2] < -0.11:
+                    done = True
+                    break
+
+                # save observations
+                obs_deque.append(observation)
+                # update progress bar
+                step_idx += 1
+                pbar.update(1)
+                if step_idx > max_steps:
+                    done = True
+                if done:
+                    break
+                        
+
